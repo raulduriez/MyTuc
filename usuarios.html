@@ -1,0 +1,318 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MyTuc | ACCESO AL USUARIO</title>
+    
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&family=Inter:wght@400;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@24,400,1,0" />
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-database-compat.js"></script>
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="data/edcion_paradas_Mang_1.js"></script>
+
+    <style>
+        :root {
+            --bg-side: #05070a;
+            --airport-yellow: #ffcc00;
+            --panic-red: #ff0000;
+            --accent-blue: #0076ff;
+            --space-robot: #00e5ff;
+        }
+
+        body { background-color: #000; color: white; font-family: 'Inter', sans-serif; margin: 0; overflow: hidden; }
+
+        #portalView {
+            height: 100vh; width: 100%; display: flex; flex-direction: column; justify-content: center; align-items: center;
+            background: #000; z-index: 999999; position: fixed; top: 0; left: 0;
+        }
+        .neon-ring-static {
+            width: 260px; height: 260px; border-radius: 50%; margin: 0 auto 25px;
+            border: 4px solid var(--space-robot); box-shadow: 0 0 20px var(--space-robot);
+            display: flex; align-items: center; justify-content: center;
+        }
+        .logo-central { width: 230px; height: 230px; border-radius: 50%; background: #000; }
+
+        .login-card { background: rgba(10, 15, 25, 0.95); padding: 25px; border-radius: 20px; border: 1px solid var(--airport-yellow); text-align: center; width: 320px; }
+        .login-input { background: #000; border: 1px solid #444; color: var(--airport-yellow); text-align: center; font-family: 'JetBrains Mono'; width: 100%; padding: 12px; margin-bottom: 15px; font-size: 1.3rem; border-radius: 10px; outline: none; }
+
+        #radarView { display: none; height: 100vh; grid-template-columns: 420px 1fr; }
+        .sidebar { background-color: var(--bg-side); padding: 20px; display: flex; flex-direction: column; gap: 10px; border-right: 1px solid #222; overflow-y: auto; }
+        
+        .info-card { background: rgba(255,255,255,0.03); border: 1px solid #333; border-radius: 10px; padding: 12px; }
+        .text-resaltado { color: var(--airport-yellow); font-family: 'JetBrains Mono', monospace; font-weight: bold; font-size: 0.7rem; margin-bottom: 4px; display: block; }
+
+        #chatDisplay { height: 90px; overflow-y: auto; background: #000; border: 1px solid #222; padding: 6px; font-size: 0.7rem; border-radius: 6px; font-family: 'JetBrains Mono'; margin-bottom: 5px; }
+
+        #mapa { width: 100%; height: 100%; background: #070b12; }
+
+        /* NUEVO ICONO SONAR PULSANTE LLAMATIVO */
+        .sonar-icon-wrapper { position: relative; width: 50px; height: 50px; display: flex; align-items: center; justify-content: center; }
+        .sonar-wave { position: absolute; width: 20px; height: 20px; background: var(--accent-blue); border-radius: 50%; opacity: 0.5; animation: sonarExpand 2s infinite ease-out; }
+        .sonar-core { position: relative; width: 16px; height: 16px; background: #fff; border: 3px solid var(--accent-blue); border-radius: 50%; box-shadow: 0 0 15px var(--accent-blue); z-index: 5; }
+
+        @keyframes sonarExpand { 
+            0% { width: 20px; height: 20px; opacity: 0.8; } 
+            100% { width: 60px; height: 60px; opacity: 0; } 
+        }
+
+        .bus-icon-map { font-size: 32px; color: #2ecc71; filter: drop-shadow(0 0 10px #2ecc71); }
+
+        .btn-sos-global {
+            background: var(--panic-red); color: white; border: none; padding: 14px; border-radius: 10px;
+            font-weight: 900; width: 100%; cursor: pointer; box-shadow: 0 0 20px rgba(255, 0, 0, 0.4);
+        }
+        #btnCancelSOS {
+            background: #222; color: #ffcc00; border: 2px solid var(--airport-yellow); padding: 12px; border-radius: 10px;
+            font-weight: bold; width: 100%; cursor: pointer; margin-top: 10px; display: none; font-size: 0.9rem;
+        }
+    </style>
+</head>
+<body>
+
+    <div id="portalView">
+        <div class="portal-container">
+            <div class="neon-ring-static">
+                <img src="img/Logo2.jpeg" class="logo-central">
+            </div>
+            <div class="login-card">
+                <p class="small text-white mb-2 fw-bold">ID TELÉFONO</p>
+                <input type="tel" id="userPhone" class="login-input" placeholder="88888888" maxlength="8">
+                <button class="btn btn-warning w-100 fw-bold py-2" onclick="accederSistema()">ACTIVAR RADAR</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="radarView">
+        <aside class="sidebar">
+            <img src="img/Logo2.jpeg" style="width:60px; margin: 0 auto; border-radius:50%; border:2px solid var(--airport-yellow);">
+            
+            <div class="info-card">
+                <span class="text-resaltado">🛸 REPORTE DINÁMICO</span>
+                <button class="btn btn-sm btn-info w-100 fw-bold" onclick="hablarRobotCompleto()">
+                    <i class="fas fa-robot"></i> INFORME DE VOZ
+                </button>
+            </div>
+
+            <div class="info-card">
+                <span class="text-resaltado">📍 SCANNER DE PARADA</span>
+                <input list="listaP" id="searchStop" class="form-control bg-dark text-white border-secondary mb-2" placeholder="Seleccionar..." onchange="cambiarParadaManual()">
+                <datalist id="listaP"></datalist>
+                <div id="nearestInfo" class="text-white small fw-bold">Sincronizando...</div>
+            </div>
+
+            <div class="info-card">
+                <span class="text-resaltado">📋 ESTADO DE ARRIBOS</span>
+                <div id="busList" class="small"></div>
+            </div>
+
+            <div class="info-card">
+                <span class="text-resaltado">💬 COMUNIDAD MYTUC</span>
+                <div id="chatDisplay"></div>
+                <div class="input-group input-group-sm">
+                    <input type="text" id="chatInput" class="form-control bg-dark text-white border-secondary" placeholder="Reportar...">
+                    <button class="btn btn-warning" onclick="enviarMensajeComunidad()"><i class="fas fa-paper-plane"></i></button>
+                </div>
+            </div>
+
+            <div class="panic-action mt-auto">
+                <button id="btnSOS" class="btn-sos-global" onclick="verificarEmergencia()">
+                    <i class="fas fa-triangle-exclamation"></i> EMERGENCIA
+                </button>
+                <button id="btnCancelSOS" onclick="cancelarEmergencia()">
+                    SUSPENDER PETICIÓN
+                </button>
+            </div>
+        </aside>
+        <main id="mapa"></main>
+    </div>
+
+    <script>
+        const firebaseConfig = { apiKey: "AIzaSyDGBkCnWppaprzs2gUkTj16nk6WOiLn5yQ", databaseURL: "https://bus-tracker-managua-default-rtdb.firebaseio.com" };
+        firebase.initializeApp(firebaseConfig);
+        const db = firebase.database();
+
+        let map, miPos, selectedStop, phoneNum, sosActive = false, warningInProcess = false;
+        let busMarkers = {}, userMarker, stopMarker, line, sosTimer, userActual = "Usuario";
+        let busReport = "No hay buses cerca.";
+        let proximidadAlertada = false;
+
+        function fVozTel(n) { let s = n.toString(); return s.split('').join(' '); }
+
+        function accederSistema() {
+            phoneNum = document.getElementById('userPhone').value;
+            if(phoneNum.length < 8) return alert("Número requerido.");
+            
+            db.ref('usuarios_registrados/' + phoneNum).once('value', snap => {
+                const data = snap.val();
+                userActual = (data && data.nombre) ? data.nombre : "Usuario";
+                document.getElementById('portalView').style.display = 'none';
+                document.getElementById('radarView').style.display = 'grid';
+                if(!map) {
+                    map = L.map('mapa', { zoomControl: false }).setView([12.1150, -86.2363], 13);
+                    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
+                }
+                setTimeout(() => { map.invalidateSize(); iniciarGPS(); }, 500);
+                robotVoz(`Acceso aceptado. Hola ${userActual}. Radar activo.`);
+            });
+        }
+
+        function iniciarGPS() {
+            navigator.geolocation.watchPosition(p => {
+                miPos = [p.coords.latitude, p.coords.longitude];
+                if(!selectedStop || !warningInProcess) { 
+                    let min = Infinity;
+                    json_edcion_paradas_Mang_1.features.forEach(f => {
+                        let d = getD(miPos[0], miPos[1], f.geometry.coordinates[1], f.geometry.coordinates[0]);
+                        if(d < min) { min = d; selectedStop = f; }
+                    });
+                }
+                db.ref('monitoreo_usuarios/' + phoneNum).update({ loc: miPos, status: sosActive ? "EMERGENCIA" : "OK", time: Date.now() });
+                pintarRadar();
+                pintarBusesReal();
+            }, null, {enableHighAccuracy: true, maximumAge: 5000});
+        }
+
+        function cambiarParadaManual() {
+            const v = document.getElementById('searchStop').value;
+            const stop = json_edcion_paradas_Mang_1.features.find(f => f.properties.Nom_Parada === v);
+            if(stop) {
+                selectedStop = stop;
+                proximidadAlertada = false;
+                pintarRadar();
+                robotVoz(`Información de la parada ${v} lista.`);
+            }
+        }
+
+        function pintarRadar() {
+            if(!selectedStop || !miPos) return;
+            const sC = [selectedStop.geometry.coordinates[1], selectedStop.geometry.coordinates[0]];
+            const dist = (getD(miPos[0], miPos[1], sC[0], sC[1]) * 1000).toFixed(0);
+            const walk = Math.round(dist / 80); 
+            document.getElementById('nearestInfo').innerHTML = `PARADA: ${selectedStop.properties.Nom_Parada}<br>A PIE: ${walk} min`;
+            
+            // Lógica corregida para el Icono Sonar
+            const sonarIcon = L.divIcon({
+                html: '<div class="sonar-icon-wrapper"><div class="sonar-wave"></div><div class="sonar-core"></div></div>',
+                className: 'bg-transparent',
+                iconSize: [60, 60],
+                iconAnchor: [30, 30]
+            });
+
+            if(userMarker) userMarker.setLatLng(miPos);
+            else userMarker = L.marker(miPos, {icon: sonarIcon, zIndexOffset: 1000}).addTo(map);
+            
+            if(stopMarker) stopMarker.setLatLng(sC);
+            else stopMarker = L.marker(sC, {icon: L.divIcon({html:'<i class="fas fa-map-marker-alt" style="color:var(--accent-blue); font-size:30px;"></i>', className:'bg-transparent'})}).addTo(map);
+            
+            if(line) map.removeLayer(line);
+            line = L.polyline([miPos, sC], {color: 'var(--accent-blue)', weight: 4, dashArray: '10, 10'}).addTo(map);
+            map.flyTo(miPos, 16);
+        }
+
+        function pintarBusesReal() {
+            db.ref('buses').on('value', snap => {
+                const data = snap.val();
+                const list = document.getElementById('busList');
+                list.innerHTML = '';
+                busReport = "No hay buses activados."; 
+                if(data && selectedStop) {
+                    const sC = [selectedStop.geometry.coordinates[1], selectedStop.geometry.coordinates[0]];
+                    const closest = Object.entries(data)
+                        .map(([id, b]) => ({ id, ...b, d: getD(b.lat, b.lng, sC[0], sC[1]) }))
+                        .filter(b => b.d < 5)
+                        .sort((a, b) => a.d - b.d).slice(0, 3);
+                    
+                    if(closest.length > 0) {
+                        busReport = "";
+                        closest.forEach((bus, i) => {
+                            const m = Math.round(bus.d * 4);
+                            list.innerHTML += `<div class="mb-1 text-success fw-bold">UNIDAD-${bus.id.slice(-3)}: ${m} MIN</div>`;
+                            busReport += `La unidad ${i+1} llegará en ${m} minutos. `;
+                            
+                            if(m <= 1 && !proximidadAlertada) {
+                                proximidadAlertada = true;
+                                robotVoz(`Atención ${userActual}, un bus está llegando. Prepárese para abordar.`);
+                            }
+
+                            if(busMarkers[bus.id]) busMarkers[bus.id].setLatLng([bus.lat, bus.lng]);
+                            else busMarkers[bus.id] = L.marker([bus.lat, bus.lng], {icon: L.divIcon({html:'<i class="fas fa-bus bus-icon-map"></i>', className:'bg-transparent'})}).addTo(map);
+                        });
+                    } else { 
+                        list.innerHTML = '<div class="text-muted">No hay buses activados.</div>'; 
+                        proximidadAlertada = false;
+                    }
+                }
+            });
+        }
+
+        function verificarEmergencia() {
+            if(sosActive || warningInProcess) return;
+            warningInProcess = true;
+            robotVoz(`${userActual}, ha solicitado una emergencia. MyTuc coordina con el Gobierno de Nicaragua. Si fue un error, suspenda ahora.`);
+            document.getElementById('btnCancelSOS').style.display = 'block';
+            sosTimer = setTimeout(confirmarEmergencia, 20000); 
+        }
+
+        function cancelarEmergencia() {
+            clearTimeout(sosTimer);
+            warningInProcess = false;
+            document.getElementById('btnCancelSOS').style.display = 'none';
+            robotVoz(`Emergencia cancelada, ${userActual}.`);
+        }
+
+        function confirmarEmergencia() {
+            sosActive = true;
+            warningInProcess = false;
+            document.getElementById('btnCancelSOS').style.display = 'none';
+            robotVoz(`Emergencia confirmada.`);
+            db.ref('alertas_emergencia/' + phoneNum).set({ tel: phoneNum, loc: miPos, status: "ACTIVA", time: Date.now() });
+        }
+
+        function hablarRobotCompleto() {
+            if(!selectedStop) return;
+            const d = getD(miPos[0], miPos[1], selectedStop.geometry.coordinates[1], selectedStop.geometry.coordinates[0]);
+            const walk = Math.round((d * 1000) / 80);
+            robotVoz(`${userActual}, su número es ${fVozTel(phoneNum)}. Parada ${selectedStop.properties.Nom_Parada} a ${walk} minutos a pie. ${busReport}`);
+        }
+
+        function robotVoz(t) {
+            if('speechSynthesis' in window) {
+                const s = window.speechSynthesis; s.cancel();
+                const m = new SpeechSynthesisUtterance(t);
+                m.pitch = 0.4; m.rate = 0.9; m.lang = 'es-MX'; s.speak(m);
+            }
+        }
+
+        function enviarMensajeComunidad() {
+            const inp = document.getElementById('chatInput');
+            if(inp.value) {
+                db.ref('chat_comunidad').push({ tel: phoneNum.slice(-4), msg: inp.value, time: Date.now() });
+                inp.value = '';
+            }
+        }
+
+        db.ref('chat_comunidad').limitToLast(10).on('child_added', snap => {
+            const d = snap.val();
+            const box = document.getElementById('chatDisplay');
+            box.innerHTML += `<div><span class="text-warning">U-${d.tel}:</span> ${d.msg}</div>`;
+            box.scrollTop = box.scrollHeight;
+        });
+
+        function getD(lat1, lon1, lat2, lon2) {
+            const R = 6371; const dLat = (lat2-lat1)*Math.PI/180; const dLon = (lon2-lon1)*Math.PI/180;
+            const a = Math.sin(dLat/2)**2 + Math.cos(lat1*Math.PI/180)*Math.cos(lat2*Math.PI/180)*Math.sin(dLon/2)**2;
+            return R * (2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a)));
+        }
+
+        const dl = document.getElementById('listaP');
+        json_edcion_paradas_Mang_1.features.forEach(f => {
+            let o = document.createElement('option'); o.value = f.properties.Nom_Parada; dl.appendChild(o);
+        });
+    </script>
+</body>
+</html>

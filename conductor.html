@@ -1,0 +1,292 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MyTuc | Panel Conductor</title>
+    
+    <!-- Librerías Externas -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-database-compat.js"></script>
+
+    <style>
+        :root {
+            --bg-dark: #070b12;
+            --accent: #ff3d00; 
+            --glow: #7000ff;
+            --azul-deep: #004e92;
+        }
+
+        body {
+            margin: 0;
+            min-height: 100vh;
+            background: radial-gradient(circle at center, var(--azul-deep), var(--bg-dark)) !important;
+            font-family: 'Segoe UI', sans-serif;
+            color: white;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            overflow: hidden;
+        }
+
+        /* --- ESTILO PORTAL CIRCULAR --- */
+        #portalConductor {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            transition: 0.5s;
+        }
+
+        .portal-container {
+            position: relative;
+            width: 250px; height: 250px;
+            display: flex; justify-content: center; align-items: center;
+            cursor: pointer;
+        }
+
+        .space-ring {
+            position: absolute;
+            width: 100%; height: 100%;
+            border-radius: 50%;
+            background: conic-gradient(from 0deg, transparent, var(--accent), var(--glow), transparent);
+            animation: spin 1.5s linear infinite;
+            filter: drop-shadow(0 0 20px var(--accent));
+        }
+
+        .space-ring::after {
+            content: '';
+            position: absolute; inset: 8px;
+            background: var(--bg-dark);
+            border-radius: 50%;
+        }
+
+        @keyframes spin { 100% { transform: rotate(360deg); } }
+
+        .logo-central {
+            width: 180px; height: 180px;
+            border-radius: 50%;
+            z-index: 10;
+            object-fit: cover;
+            border: 2px solid rgba(255,255,255,0.2);
+        }
+
+        /* --- MODAL Y PANEL DE CONTROL --- */
+        .access-card {
+            display: none;
+            position: fixed;
+            background: #111827;
+            padding: 25px;
+            border-radius: 24px;
+            border: 1px solid var(--accent);
+            text-align: center;
+            width: 85%;
+            max-width: 340px;
+            z-index: 100;
+            box-shadow: 0 20px 50px rgba(0,0,0,0.8);
+        }
+
+        #panelTransmision {
+            display: none;
+            width: 90%;
+            max-width: 400px;
+            background: rgba(10, 14, 20, 0.95);
+            border-radius: 30px;
+            padding: 30px;
+            border: 1px solid var(--accent);
+            text-align: center;
+        }
+
+        .status-box {
+            background: rgba(255,255,255,0.05);
+            border-radius: 15px;
+            padding: 15px;
+            margin: 20px 0;
+            border-left: 5px solid var(--accent);
+        }
+
+        .btn-transmitir {
+            background: var(--accent);
+            color: white;
+            font-weight: bold;
+            border: none;
+            border-radius: 15px;
+            padding: 12px;
+            width: 100%;
+            font-size: 1.1rem;
+            transition: 0.3s;
+            margin-top: 10px;
+        }
+
+        .active-pulse {
+            animation: pulse-green 1.5s infinite;
+            background: #2ecc71 !important;
+        }
+
+        @keyframes pulse-green {
+            0% { box-shadow: 0 0 0 0px rgba(46, 204, 113, 0.7); }
+            100% { box-shadow: 0 0 0 15px rgba(46, 204, 113, 0); }
+        }
+
+        #overlay {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: rgba(0,0,0,0.85);
+            backdrop-filter: blur(5px);
+            z-index: 90;
+        }
+
+        /* CORRECCIÓN DE LEGIBILIDAD: Letras de referencia blancas */
+        input.form-control {
+            color: white !important;
+        }
+        input::placeholder { 
+            color: rgba(255, 255, 255, 0.8) !important; /* Blanco brillante con opacidad suave */
+            font-size: 0.85rem; 
+        }
+    </style>
+</head>
+<body>
+
+    <!-- VISTA 1: PORTAL DE ENTRADA -->
+    <div id="portalConductor" onclick="abrirPortal()">
+        <div class="portal-container">
+            <div class="space-ring"></div>
+            <img src="img/Logo.jpeg" class="logo-central" alt="Logo MyTuc">
+        </div>
+        <h2 class="mt-4 fw-bold">PANEL CONDUCTOR</h2>
+        <p class="opacity-50">Toca el logo de MyTuc para iniciar</p>
+    </div>
+
+    <div id="overlay"></div>
+
+    <!-- VISTA 2: FORMULARIO DE ACCESO (LETRA CORREGIDA) -->
+    <div id="modalAcceso" class="access-card">
+        <h2 class="mb-3">IDENTIFICACIÓN</h2>
+        <div class="mb-2">
+            <input type="text" id="busId" class="form-control bg-dark text-center border-secondary mb-2" placeholder="N° UNIDAD (Ej: 102)">
+            <input type="text" id="coopCod" class="form-control bg-dark text-center border-secondary mb-2" placeholder="CÓDIGO COOPERATIVA (4 dígitos)">
+            <input type="tel" id="driverTel" class="form-control bg-dark text-center border-secondary" placeholder="TU N° DE TELÉFONO (Obligatorio)">
+        </div>
+        <button class="btn-transmitir" onclick="validarAcceso()">INGRESAR AL PANEL</button>
+    </div>
+
+    <!-- VISTA 3: PANEL DE TRANSMISIÓN GPS -->
+    <div id="panelTransmision">
+        <h3 class="fw-bold text-uppercase mb-3">En Ruta</h3>
+        <div class="status-box text-start">
+            <p class="mb-1 small opacity-50">UNIDAD ACTIVA:</p>
+            <div id="displayUnidad" class="fw-bold text-white">---</div>
+            <hr class="my-2 opacity-10">
+            <p class="mb-1 small opacity-50">ESTADO GPS:</p>
+            <div id="statusText" class="fw-bold text-warning">Inactivo (Listo para seguimiento)</div>
+            <hr class="my-2 opacity-10">
+            <p class="mb-1 small opacity-50">COORDENADAS:</p>
+            <div id="coordsText" class="small">0.0000, 0.0000</div>
+        </div>
+        
+        <button id="btnGps" class="btn-transmitir" onclick="toggleTransmision()">
+            <i class="fas fa-satellite-dish"></i> ACTIVAR GPS
+        </button>
+        
+        <button class="btn btn-link text-white-50 mt-3" onclick="location.reload()">Desactivar y Salir</button>
+    </div>
+
+    <script>
+        // CONFIGURACIÓN FIREBASE
+        const firebaseConfig = { 
+            apiKey: "AIzaSyDGBkCnWppaprzs2gUkTj16nk6WOiLn5yQ", 
+            databaseURL: "https://bus-tracker-managua-default-rtdb.firebaseio.com" 
+        };
+        firebase.initializeApp(firebaseConfig);
+        const db = firebase.database();
+
+        let watchId = null;
+        let activo = false;
+
+        function abrirPortal() {
+            document.getElementById('modalAcceso').style.display = 'block';
+            document.getElementById('overlay').style.display = 'block';
+        }
+
+        function validarAcceso() {
+            const id = document.getElementById('busId').value;
+            const cod = document.getElementById('coopCod').value;
+            const tel = document.getElementById('driverTel').value;
+
+            // REGLA: No permite pasar si falta el número de teléfono
+            if(!id || !cod || !tel) {
+                alert("ERROR: Todos los campos son obligatorios, incluyendo el TELÉFONO.");
+                return;
+            }
+
+            if(cod.length === 4) {
+                db.ref('cooperativas/' + cod).once('value', snap => {
+                    if(snap.exists()) {
+                        document.getElementById('displayUnidad').innerText = `Bus ${id} (${snap.val().nombre})`;
+                        document.getElementById('modalAcceso').style.display = 'none';
+                        document.getElementById('overlay').style.display = 'none';
+                        document.getElementById('portalConductor').style.display = 'none';
+                        document.getElementById('panelTransmision').style.display = 'block';
+                    } else {
+                        alert("El código de cooperativa no es válido.");
+                    }
+                });
+            } else {
+                alert("El código de cooperativa debe ser de 4 dígitos.");
+            }
+        }
+
+        function toggleTransmision() {
+            const id = document.getElementById('busId').value;
+            const tel = document.getElementById('driverTel').value;
+            const cod = document.getElementById('coopCod').value;
+            const btn = document.getElementById('btnGps');
+            const status = document.getElementById('statusText');
+
+            if (!activo) {
+                if ("geolocation" in navigator) {
+                    activo = true;
+                    btn.innerHTML = '<i class="fas fa-stop-circle"></i> DETENER TRANSMISIÓN';
+                    btn.classList.add('active-pulse');
+                    status.innerText = "TRANSMITIENDO EN VIVO";
+                    status.className = "fw-bold text-success";
+
+                    const geoOptions = { enableHighAccuracy: true, maximumAge: 0 };
+
+                    watchId = navigator.geolocation.watchPosition(pos => {
+                        const lat = pos.coords.latitude;
+                        const lng = pos.coords.longitude;
+                        document.getElementById('coordsText').innerText = `${lat.toFixed(6)}, ${lng.toFixed(6)}`;
+
+                        // Actualizar Firebase con el teléfono como dato clave
+                        db.ref(`buses/${id}`).set({
+                            lat: lat,
+                            lng: lng,
+                            tel: tel,
+                            unidad: id,
+                            cod_coop: cod,
+                            timestamp: Date.now()
+                        });
+                    }, (err) => {
+                        console.error("Error GPS:", err);
+                        alert("Error al obtener GPS. Active la ubicación del celular.");
+                    }, geoOptions);
+                    
+                    alert("GPS Activado correctamente.");
+                }
+            } else {
+                activo = false;
+                navigator.geolocation.clearWatch(watchId);
+                db.ref(`buses/${id}`).remove();
+                btn.innerHTML = '<i class="fas fa-satellite-dish"></i> ACTIVAR GPS';
+                btn.classList.remove('active-pulse');
+                status.innerText = "GPS Inactivo";
+                status.className = "fw-bold text-warning";
+            }
+        }
+    </script>
+</body>
+</html>

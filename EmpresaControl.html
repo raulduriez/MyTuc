@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MyTuc | Informe y Control Operativo</title>
+    
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-database-compat.js"></script>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+
+    <style>
+        :root { --bg: #0b0e14; --card: #161b22; --accent: #00a8e8; --success: #2ecc71; --danger: #e74c3c; --warning: #f1c40f; }
+        body { font-family: 'Segoe UI', sans-serif; background: var(--bg); color: white; margin: 0; display: flex; flex-direction: column; height: 100vh; overflow: hidden; }
+        header { background: var(--card); padding: 10px 20px; border-bottom: 1px solid #333; display: flex; justify-content: space-between; align-items: center; }
+        .nav-tabs { display: flex; background: #111; border-bottom: 1px solid #333; }
+        .nav-link { padding: 12px 20px; cursor: pointer; opacity: 0.6; border-bottom: 2px solid transparent; font-size: 0.85rem; }
+        .nav-link.active { opacity: 1; border-bottom: 2px solid var(--accent); color: var(--accent); }
+        .tab-content { flex: 1; display: none; overflow: hidden; }
+        .tab-content.active { display: flex; flex-direction: column; }
+        .report-area { flex: 1; overflow-y: auto; padding: 15px; background: #f4f7f6; color: #333; }
+        .table-container { background: white; padding: 15px; border-radius: 10px; margin-bottom: 20px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); }
+        .informe-table { width: 100%; border-collapse: collapse; font-size: 0.7rem; text-align: center; }
+        .informe-table th { background: #1a73e8; color: white; padding: 8px; border: 1px solid #ddd; }
+        .informe-table td { padding: 5px; border: 1px solid #ddd; }
+        .badge-status { padding: 3px 6px; border-radius: 4px; font-weight: bold; color: white; font-size: 0.6rem; }
+        .retraso { background: var(--warning); color: black; }
+        .adelanto { background: var(--danger); }
+        .puntual { background: var(--success); }
+        #authOverlay { position: fixed; inset: 0; background: var(--bg); z-index: 10000; display: flex; align-items: center; justify-content: center; }
+        .stop-label { background: rgba(0,0,0,0.8); border: 1px solid var(--accent); color: white; font-weight: bold; font-size: 9px; padding: 1px 3px; border-radius: 3px; }
+    </style>
+</head>
+<body>
+
+<div id="authOverlay">
+    <div style="background: var(--card); padding: 30px; border-radius: 15px; border: 1px solid var(--accent); text-align: center; width: 320px;">
+        <img src="img/Logo.jpeg" style="height: 60px; border-radius: 10px; margin-bottom: 15px;">
+        <h3>Acceso Control MyTuc</h3>
+        <input type="text" id="passInput" placeholder="Código de 4 dígitos" style="padding:10px; width:100%; border-radius:5px; border:none; text-align:center;">
+        <button onclick="acceder()" style="background:var(--accent); color:white; border:none; padding:12px; margin-top:15px; border-radius:5px; width:100%; cursor:pointer; font-weight:bold;">INGRESAR</button>
+    </div>
+</div>
+
+<header>
+    <div style="display:flex; align-items:center; gap:10px;">
+        <img src="img/Logo.jpeg" style="height:35px; border-radius:5px;">
+        <h1 id="headerTitle" style="font-size:1.1rem; margin:0;">Control de Operaciones</h1>
+    </div>
+    <div id="reloj" style="font-family:monospace; color:var(--accent); font-size:1.2rem; font-weight:bold;">00:00:00</div>
+</header>
+
+<div class="nav-tabs">
+    <div class="nav-link active" onclick="switchTab(event, 'tab-mapa')">MONITOREO GPS</div>
+    <div class="nav-link" onclick="switchTab(event, 'tab-informe')">INFORME DE CÁLCULOS</div>
+</div>
+
+<div id="tab-mapa" class="tab-content active">
+    <div id="map" style="height:100%;"></div>
+</div>
+
+<div id="tab-informe" class="tab-content">
+    <div class="report-area">
+        <div class="table-container">
+            <h3 style="margin-top:0; font-size:1rem; color:#1a73e8;">Registro de Ciclos (Entradas y Salidas)</h3>
+            <table class="informe-table" id="tablaCiclos">
+                <thead>
+                    <tr>
+                        <th rowspan="2">Unidad</th>
+                        <th colspan="2">Ciclo 1</th>
+                        <th colspan="2">Ciclo 2</th>
+                        <th colspan="2">Ciclo 3</th>
+                        <th colspan="2">Ciclo 4</th>
+                        <th colspan="2">Ciclo 5</th>
+                    </tr>
+                    <tr>
+                        <th>S</th><th>E</th><th>S</th><th>E</th><th>S</th><th>E</th><th>S</th><th>E</th><th>S</th><th>E</th>
+                    </tr>
+                </thead>
+                <tbody id="bodyCiclos"></tbody>
+            </table>
+        </div>
+
+        <div class="table-container">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px;">
+                <h3 style="margin:0; font-size:1rem; color:#1a73e8;">Análisis de Puntos y Detenciones</h3>
+                <button onclick="exportarInforme()" style="background:#1e8e3e; color:white; border:none; padding:8px 15px; border-radius:5px; font-weight:bold; cursor:pointer;">📥 EXPORTAR EXCEL</button>
+            </div>
+            <table class="informe-table" id="tablaDetalles">
+                <thead>
+                    <tr>
+                        <th>Unidad</th>
+                        <th>Punto de Control</th>
+                        <th>Prog.</th>
+                        <th>Real</th>
+                        <th>Dif.</th>
+                        <th>Estado</th>
+                        <th>Veces Detenido (>3m)</th>
+                        <th>Tiempo Total Parado</th>
+                    </tr>
+                </thead>
+                <tbody id="bodyDetalles"></tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<script>
+    const firebaseConfig = { apiKey: "AIzaSyDGBkCnWppaprzs2gUkTj16nk6WOiLn5yQ", databaseURL: "https://bus-tracker-managua-default-rtdb.firebaseio.com" };
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.database();
+
+    const PUNTOS = {
+        "17": { lat: 12.165573, lng: -86.3570861, t: 10, nom: "Mercadito / Alcaldía C. Sandino" },
+        "24": { lat: 12.1682998, lng: -86.3435461, t: 8, nom: "Salida C. Sandino" },
+        "31": { lat: 12.1322098, lng: -86.3138018, t: 12, nom: "Hosp. Piedrecitas" },
+        "48": { lat: 12.1257577, lng: -86.2727351, t: 30, nom: "Casimiro Sotelo Ida" },
+        "54": { lat: 12.1268021, lng: -86.2715981, t: 13, nom: "Casimiro Sotelo Vuelta" },
+        "66": { lat: 12.1299585, lng: -86.301653, t: 18, nom: "Israel (Punto 66)" },
+        "76": { lat: 12.1688275, lng: -86.3426136, t: 20, nom: "Entrada C. Sandino" }
+    };
+
+    let datosAudit = {};
+    let markers = {};
+
+    function acceder() {
+        const cod = document.getElementById('passInput').value;
+        db.ref('cooperativas/' + cod).once('value', snap => {
+            if(snap.exists()) document.getElementById('authOverlay').style.display = 'none';
+            else alert("Código incorrecto");
+        });
+    }
+
+    const map = L.map('map').setView([12.14, -86.31], 13);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { opacity: 0.5 }).addTo(map);
+
+    // DIBUJAR PUNTOS DE CONTROL PERMANENTES
+    for (let id in PUNTOS) {
+        L.circleMarker([PUNTOS[id].lat, PUNTOS[id].lng], { radius: 6, color: '#00a8e8', fillColor: "#fff", fillOpacity: 1 }).addTo(map)
+         .bindTooltip(PUNTOS[id].nom, { permanent: true, direction: 'top', className: 'stop-label' });
+    }
+
+    function switchTab(e, id) {
+        document.querySelectorAll('.tab-content, .nav-link').forEach(x => x.classList.remove('active'));
+        document.getElementById(id).classList.add('active');
+        e.target.classList.add('active');
+        if(id === 'tab-mapa') setTimeout(() => map.invalidateSize(), 200);
+    }
+
+    db.ref('buses').on('value', snap => {
+        const data = snap.val();
+        const bodyDetalles = document.getElementById('bodyDetalles');
+        const bodyCiclos = document.getElementById('bodyCiclos');
+        bodyDetalles.innerHTML = ""; bodyCiclos.innerHTML = "";
+
+        for(let id in data) {
+            const b = data[id];
+            if(!datosAudit[id]) {
+                datosAudit[id] = { ciclos: Array(10).fill("-"), check: {}, alertas: 0, tParado: 0, lastPos: null, tInm: 0, start: Date.now() };
+            }
+
+            // Lógica Alerta Detenido
+            if(datosAudit[id].lastPos) {
+                let d = map.distance([b.lat, b.lng], [datosAudit[id].lastPos.lat, datosAudit[id].lastPos.lng]);
+                if(d < 10) {
+                    datosAudit[id].tInm += 10;
+                    if(datosAudit[id].tInm >= 180) { 
+                        datosAudit[id].alertas++; 
+                        datosAudit[id].tParado += 3; 
+                        datosAudit[id].tInm = 0; 
+                    }
+                } else { datosAudit[id].tInm = 0; }
+            }
+            datosAudit[id].lastPos = {lat: b.lat, lng: b.lng};
+
+            // Llenar Tabla Ciclos (Simulada para visualización)
+            bodyCiclos.innerHTML += `<tr><td><b>${id}</b></td>${datosAudit[id].ciclos.map(c => `<td>${c}</td>`).join("")}</tr>`;
+
+            // Llenar Tabla Detalles y Cálculos
+            for(let pKey in PUNTOS) {
+                let dist = map.distance([b.lat, b.lng], [PUNTOS[pKey].lat, PUNTOS[pKey].lng]);
+                if(dist < 120 && !datosAudit[id].check[pKey]) {
+                    let real = Math.round((Date.now() - datosAudit[id].start) / 60000);
+                    datosAudit[id].check[pKey] = real;
+                }
+
+                if(datosAudit[id].check[pKey]) {
+                    let realTime = datosAudit[id].check[pKey];
+                    let progTime = PUNTOS[pKey].t;
+                    let diff = realTime - progTime;
+                    let est = diff > 3 ? "Retraso" : (diff < -3 ? "Adelanto" : "Puntual");
+                    let cl = diff > 3 ? "retraso" : (diff < -3 ? "adelanto" : "puntual");
+
+                    bodyDetalles.innerHTML += `
+                        <tr>
+                            <td>${id}</td>
+                            <td>${PUNTOS[pKey].nom}</td>
+                            <td>${progTime}m</td>
+                            <td>${realTime}m</td>
+                            <td>${diff}m</td>
+                            <td><span class="badge-status ${cl}">${est}</span></td>
+                            <td style="color:red; font-weight:bold;">${datosAudit[id].alertas}</td>
+                            <td>${datosAudit[id].tParado} min</td>
+                        </tr>`;
+                }
+            }
+
+            // Marcadores Mapa
+            if(markers[id]) markers[id].setLatLng([b.lat, b.lng]);
+            else markers[id] = L.marker([b.lat, b.lng], { icon: L.divIcon({className:'bus', html:`<div style="background:var(--accent); color:white; padding:4px 8px; border-radius:50%; font-weight:bold; border:2px solid #fff;">${id}</div>`}) }).addTo(map);
+        }
+    });
+
+    setInterval(() => { document.getElementById('reloj').innerText = new Date().toLocaleTimeString(); }, 1000);
+    function exportarInforme() { XLSX.writeFile(XLSX.utils.table_to_book(document.getElementById("tablaDetalles")), "Informe_Audit_MyTuc.xlsx"); }
+</script>
+</body>
+</html>
